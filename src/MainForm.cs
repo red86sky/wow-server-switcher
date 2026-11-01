@@ -172,8 +172,7 @@ namespace WowRegionSwitcher
             Panel help = new Panel() { Dock = DockStyle.Fill, BackColor = card, Padding = new Padding(16, 8, 16, 5) };
             Label helpTitle = NewLabel("运行方式", 9.4F, white, true);
             helpTitle.Height = 22; helpTitle.Dock = DockStyle.Top;
-            Label helpText = NewLabel("点击“配置入口”可自定义名称、魔兽安装目录、战网默认下载目录和登录区域。
-切换前自动正常关闭战网、等待 Agent 退出；\r\n若游戏仍运行或后台无法退出会弹窗阻止切换。修改前自动备份，不移动文件。", 8.7F, muted, false);
+            Label helpText = NewLabel("点击“配置入口”可自定义名称、魔兽安装目录、战网默认下载目录和登录区域。\r\n切换前自动正常关闭战网、等待 Agent 退出；\r\n若游戏仍运行或后台无法退出会弹窗阻止切换。修改前自动备份，不移动文件。", 8.7F, muted, false);
             helpText.Height = 42; helpText.Dock = DockStyle.Fill;
             help.Controls.Add(helpText);
             help.Controls.Add(helpTitle);
