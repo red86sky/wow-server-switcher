@@ -1,0 +1,27 @@
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local runtime data
+logs/
+backups/
+*.log
+*.local.json
+
+# Build artifacts and dependencies
+node_modules/
+dist/
+build/
+bin/
+obj/
+.venv/
+__pycache__/
+
+# Editor and OS files
+.vs/
+.idea/
+Thumbs.db
+.DS_Store
