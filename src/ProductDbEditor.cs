@@ -174,6 +174,16 @@ namespace WowRegionSwitcher
         /// </summary>
         public static string[] FindSwitchBlockers(byte[] db, params string[] targetCodes)
         {
+            return FindSwitchBlockers(db, false, targetCodes);
+        }
+
+        // Agent's own ProductOperations.activeOperation may be persisted after its
+        // process has exited. It is not proof that an update is still executing.
+        // Callers MUST independently prove: no Agent process and no product.db.new
+        // exists before allowing this narrow exception. Install handshakes, WoW
+        // operations, and other games' operations remain strict blockers.
+        public static string[] FindSwitchBlockers(byte[] db, bool agentConfirmedStopped, params string[] targetCodes)
+        {
             if (db == null || db.Length == 0 || db.Length > MaxDatabaseBytes)
                 throw new InvalidDataException("Invalid product.db length.");
             List<string> result = new List<string>();
@@ -201,6 +211,11 @@ namespace WowRegionSwitcher
                 {
                     ProductRecord product = ReadProduct(top.Data);
                     if (!IsInList(product.Code, targetCodes)) continue;
+                    // Narrow exception for a dormant *Agent self-update marker*.
+                    // Do not suppress InstallHandshake (handled above) or other
+                    // game operations, even if the updater is not running.
+                    if (agentConfirmedStopped && string.Equals(product.Code, "agent", StringComparison.OrdinalIgnoreCase))
+                        continue;
                     foreach (Field entry in ReadFields(top.Data))
                     {
                         if (entry.Number != 5 || entry.Wire != 2) continue;

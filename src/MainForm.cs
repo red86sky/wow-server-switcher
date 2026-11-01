@@ -60,7 +60,7 @@ namespace WowRegionSwitcher
         {
             initialAutoRegion = autoRegion;
             settings = AppSettings.Load();
-            Text = "WoW Region Switcher v0.5.1-dev";
+            Text = "WoW Region Switcher v0.5.2-dev";
             Icon = SystemIcons.Application;
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(730, 610);
@@ -362,10 +362,10 @@ namespace WowRegionSwitcher
                 lblCurrent.Text = "当前安装记录：混合 / 目标路径未配置完整";
                 lblCurrent.ForeColor = orange;
             }
-            string[] blockers = ProductDbEditor.FindSwitchBlockers(File.ReadAllBytes(dbPath));
+            string[] blockers = EffectiveInstallBlockers(File.ReadAllBytes(dbPath), false);
             if (blockers.Length > 0)
             {
-                lblCurrent.Text = "检测到游戏更新 / 安装任务：切换已被保护锁拦截";
+                lblCurrent.Text = "检测到仍有更新 / 安装任务：切换已被保护锁拦截";
                 lblCurrent.ForeColor = orange;
                 SetStatus("更新期间不能切换安装路径；请先让战网更新结束。", orange);
             }
@@ -691,15 +691,43 @@ namespace WowRegionSwitcher
             }
         }
 
+        private bool IsAgentConfirmedStopped()
+        {
+            // An agent cannot be considered dormant merely because product.db
+            // looks unchanged. Verify both the live process list and pending DB
+            // replacement file. Access/permission failure must fail closed.
+            if (File.Exists(Path.Combine(Path.GetDirectoryName(dbPath), "product.db.new")))
+                return false;
+            Process[] processes = BlockingProcesses();
+            try { return !processes.Any(IsAgentProcess); }
+            finally { foreach (Process process in processes) process.Dispose(); }
+        }
+
+        private string[] EffectiveInstallBlockers(byte[] bytes, bool logDormantStatus)
+        {
+            bool agentStopped = IsAgentConfirmedStopped();
+            string[] blockers = ProductDbEditor.FindSwitchBlockers(bytes, agentStopped);
+            if (logDormantStatus && agentStopped)
+            {
+                string[] raw = ProductDbEditor.FindSwitchBlockers(bytes);
+                string[] dormant = raw.Except(blockers).ToArray();
+                if (dormant.Length != 0)
+                    Logger.Info("DORMANT_AGENT_OPERATION", "Ignoring persisted agent-only metadata after process/new-file check: " +
+                        string.Join("; ", dormant));
+            }
+            return blockers;
+        }
+
         private void AssertNoActiveInstall(string secondaryCode)
         {
             byte[] bytes = File.ReadAllBytes(dbPath);
-            // Before stopping Agent, protect ALL running Battle.net installs/updates,
-            // not only WoW: killing Agent could otherwise interrupt another game.
-            string[] blockers = ProductDbEditor.FindSwitchBlockers(bytes);
+            // Block live game tasks, other Blizzard game updates and active
+            // install handshakes. Only ignore *agent's own* operation marker
+            // when there is no Agent process and no pending database file.
+            string[] blockers = EffectiveInstallBlockers(bytes, true);
             if (blockers.Length > 0)
                 throw new InvalidOperationException(
-                    "检测到魔兽世界仍存在下载、更新、修复或安装任务：\r\n" +
+                    "检测到仍有下载、更新、修复或安装任务：\r\n" +
                     string.Join("\r\n", blockers) +
                     "\r\n\r\n本次没有修改安装数据库，也不会强制结束下载。" +
                     "请先在战网完成更新，完全退出战网后再次点击目标区服。" +
@@ -1035,7 +1063,7 @@ namespace WowRegionSwitcher
         private string Diagnostics()
         {
             StringBuilder data = new StringBuilder();
-            data.AppendLine("WoW Region Switcher WinForms v0.5.1-dev 诊断");
+            data.AppendLine("WoW Region Switcher WinForms v0.5.2-dev 诊断");
             data.AppendLine("时间：" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             data.AppendLine("系统：" + Environment.OSVersion + " / " + (Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit"));
             data.AppendLine("管理员权限：" + IsAdministrator());
@@ -1055,8 +1083,13 @@ namespace WowRegionSwitcher
                         " [play_region=" + (record.PlayRegion == "" ? "<empty>" : record.PlayRegion) + "]");
                 data.AppendLine("数据库指纹（SHA256前8字节）：" + DbFingerprint(File.ReadAllBytes(dbPath)));
                 data.AppendLine("数据库修改时间UTC：" + File.GetLastWriteTimeUtc(dbPath).ToString("o"));
-                string[] blockers = ProductDbEditor.FindSwitchBlockers(File.ReadAllBytes(dbPath));
-                data.AppendLine("进行中的安装/更新任务：" + (blockers.Length == 0 ? "无" : string.Join("；", blockers)));
+                byte[] snapshot = File.ReadAllBytes(dbPath);
+                string[] blockers = EffectiveInstallBlockers(snapshot, false);
+                string[] rawBlockers = ProductDbEditor.FindSwitchBlockers(snapshot);
+                string[] dormantAgent = rawBlockers.Except(blockers).ToArray();
+                data.AppendLine("当前应阻止切换的安装/更新任务：" + (blockers.Length == 0 ? "无" : string.Join("；", blockers)));
+                data.AppendLine("已停止 Agent 的残留操作记录（仅供诊断）：" +
+                    (dormantAgent.Length == 0 ? "无" : string.Join("；", dormantAgent)));
                 string newFile = Path.Combine(Path.GetDirectoryName(dbPath), "product.db.new");
                 data.AppendLine("product.db.new 是否存在：" + File.Exists(newFile));
                 string secondary = IdentifySecondary(records);

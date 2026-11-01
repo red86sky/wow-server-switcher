@@ -192,6 +192,40 @@ namespace WowRegionSwitcher
             Ensure(ProductDbEditor.FindSwitchBlockers(idleUpdate, "wow", "wowf").Length == 0,
                 "OP_NONE must not be treated as an update");
 
+            // Regression (2026-11-01): Asia -> CN was blocked by persisted
+            // "agent: updating" despite zero Agent processes and no .new file.
+            // The overload is only valid AFTER the caller confirms Agent stopped.
+            byte[] staleAgent = Database(
+                Entry("wow", ASIA), Entry("wowf", ASIA),
+                Field(1, Concat(Product("agent", @"C:\ProgramData\Battle.net\Agent"),
+                    Field(5, NumberField(1, 0u)))));
+            Ensure(ProductDbEditor.FindSwitchBlockers(staleAgent).Length == 1,
+                "unconfirmed Agent update remains protected");
+            Ensure(ProductDbEditor.FindSwitchBlockers(staleAgent, true).Length == 0,
+                "dormant Agent self-operation can be ignored when confirmed stopped");
+            Ensure(ProductDbEditor.FindSwitchBlockers(staleAgent, false).Length == 1,
+                "Agent update must still block when Agent is running");
+            Ensure(ProductDbEditor.FindSwitchBlockers(staleAgent, true, "agent").Length == 0,
+                "filtered dormant Agent operation is absent");
+            byte[] staleAgentAndWoW = Concat(staleAgent,
+                Field(1, Concat(Product("wow", ASIA), Field(5, NumberField(1, 0u)))));
+            Ensure(ProductDbEditor.FindSwitchBlockers(staleAgentAndWoW, true).Length == 1,
+                "real WoW update remains a blocker even if Agent is stopped");
+            byte[] staleAgentAndOtherGame = Concat(staleAgent,
+                Field(1, Concat(Product("w3", @"F:\Other Game"), Field(5, NumberField(1, 0u)))));
+            Ensure(ProductDbEditor.FindSwitchBlockers(staleAgentAndOtherGame, true).Length == 1,
+                "another game's running update remains a blocker");
+            byte[] staleAgentAndHandshake = Concat(staleAgent,
+                Field(2, Concat(TextField(1, "agent"), Field(3, TextField(1, CN)))));
+            Ensure(ProductDbEditor.FindSwitchBlockers(staleAgentAndHandshake, true).Length == 1,
+                "active Agent install handshake is not suppressed by operation exception");
+            byte[] mixedAgentOps = Database(
+                Field(1, Concat(Product("Agent", @"C:\ProgramData\Battle.net\Agent"),
+                    Field(5, NumberField(1, 0u)))),
+                Entry("wow", ASIA), Entry("wowf", ASIA));
+            Ensure(ProductDbEditor.FindSwitchBlockers(mixedAgentOps, true).Length == 0,
+                "agent code match is case insensitive");
+
             // Regression: never mistake our GUI or bootstrap as a game / Battle.net.
             Ensure(ProcessClassifier.IsOwnApplicationName("WowRegionSwitcher_Managed") &&
                 !ProcessClassifier.IsGameProcess("WowRegionSwitcher_Managed", "", CN, ASIA),
