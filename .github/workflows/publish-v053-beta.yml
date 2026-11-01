@@ -1,0 +1,78 @@
+name: Publish v0.5.3-beta.1 (one-time pre-release)
+
+# One-time opt-in release: creating this workflow file on main triggers it once.
+# Ordinary subsequent commits will not match this workflow's path filter.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-v053-beta.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows-release:
+    if: github.repository == 'red86sky/wow-server-switcher'
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout exact source commit
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Compile WinForms and run offline regression tests
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (!(Test-Path $csc)) { $csc = "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe" }
+          if (!(Test-Path $csc)) { throw 'Missing .NET Framework csc.exe' }
+          $sources = Get-ChildItem src -Filter '*.cs' | ForEach-Object { $_.FullName }
+          & $csc '/nologo' '/target:exe' '/platform:anycpu' '/codepage:65001' "/out:$PWD\dist\OfflineTests.exe" '/reference:System.dll' '/reference:System.Core.dll' '/reference:System.Windows.Forms.dll' '/reference:System.Drawing.dll' '/reference:System.Xml.dll' $sources
+          if ($LASTEXITCODE -ne 0) { throw 'C# compilation failed' }
+          & .\dist\OfflineTests.exe --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'Offline regression test failure' }
+
+      - name: Build Windows GUI EXE
+        shell: pwsh
+        run: |
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'amd64'
+          $env:CGO_ENABLED = '0'
+          go build -trimpath -ldflags '-H=windowsgui -s -w' -o 'dist/WoWRegionSwitcher.exe' .
+          if ($LASTEXITCODE -ne 0) { throw 'Go Windows GUI build failed' }
+
+      - name: Package portable ZIP and checksums
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $zip = 'dist/WoWRegionSwitcher_v0.5.3-beta.1_win-x64.zip'
+          Compress-Archive -Force -Path 'dist/WoWRegionSwitcher.exe','README.md','README.en.md','LICENSE','docs/RELEASE_NOTES_v0.5.3-beta.1.md' -DestinationPath $zip
+          @('dist/WoWRegionSwitcher.exe', $zip) | ForEach-Object {
+            $hash = (Get-FileHash $_ -Algorithm SHA256).Hash.ToLowerInvariant()
+            "$hash  $(Split-Path $_ -Leaf)"
+          } | Set-Content -Path 'dist/SHA256SUMS.txt' -Encoding utf8
+
+      - name: Verify no existing version release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view 'v0.5.3-beta.1' --repo '${{ github.repository }}' --json tagName 2>$null
+          if ($LASTEXITCODE -eq 0) { throw 'Release already exists. Never overwrite published assets.' }
+          exit 0
+
+      - name: Publish PRE-RELEASE with tested Windows artifacts
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create 'v0.5.3-beta.1' 'dist/WoWRegionSwitcher.exe' 'dist/WoWRegionSwitcher_v0.5.3-beta.1_win-x64.zip' 'dist/SHA256SUMS.txt' --repo '${{ github.repository }}' --target '${{ github.sha }}' --prerelease --title 'WoW Region Switcher v0.5.3-beta.1' --notes-file 'docs/RELEASE_NOTES_v0.5.3-beta.1.md'
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub Release creation failed' }
