@@ -39,7 +39,34 @@ namespace WowRegionSwitcher
                     if (string.Equals(arg, "--auto=CN", StringComparison.OrdinalIgnoreCase)) requestedRegion = "CN";
                     if (string.Equals(arg, "--auto=ASIA", StringComparison.OrdinalIgnoreCase)) requestedRegion = "ASIA";
                 }
-                Application.Run(new MainForm(requestedRegion));
+                // Only one WinForms controller per Windows logon session.
+                // Otherwise a second copy can close the Battle.net client that
+                // the first copy has just launched. Elevated --auto handover is
+                // allowed to wait for the original controller to exit.
+                using (Mutex singleInstance = new Mutex(false, @"Local\WoWRegionSwitcher_WinForms_Main"))
+                {
+                    bool acquired = false;
+                    bool elevatedHandover = !string.IsNullOrEmpty(requestedRegion);
+                    try
+                    {
+                        try { acquired = singleInstance.WaitOne(elevatedHandover ? 15000 : 0, false); }
+                        catch (AbandonedMutexException) { acquired = true; }
+                        if (!acquired)
+                        {
+                            Logger.Info("SINGLE_INSTANCE_BLOCKED", "pid=" + System.Diagnostics.Process.GetCurrentProcess().Id);
+                            MessageBox.Show("已有一个魔兽双区服助手窗口正在运行。请使用原窗口，\r\n" +
+                                "并等待启动后的路径复核完成，不要同时开启第二个实例。",
+                                "程序已在运行", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                            return;
+                        }
+                        Logger.Info("INSTANCE_STARTED", "pid=" + System.Diagnostics.Process.GetCurrentProcess().Id);
+                        Application.Run(new MainForm(requestedRegion));
+                    }
+                    finally
+                    {
+                        if (acquired) singleInstance.ReleaseMutex();
+                    }
+                }
             }
             catch (Exception ex)
             {

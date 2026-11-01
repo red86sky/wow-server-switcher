@@ -24,7 +24,7 @@ import (
 //go:embed src/*.cs
 var sources embed.FS
 
-const appVersion = "0.5.3-beta.1"
+const appVersion = "0.5.3-beta.2"
 
 func messageBox(title string, body string) {
 	dll := syscall.NewLazyDLL("user32.dll")
@@ -41,7 +41,7 @@ func run() error {
 	if dir == "" {
 		dir = os.TempDir()
 	}
-	base := filepath.Join(dir, "WoWRegionSwitcherWinForms", "managed_v0_5_3")
+	base := filepath.Join(dir, "WoWRegionSwitcherWinForms", "managed_v0_5_3_2")
 	srcDir := filepath.Join(base, "src")
 	managedExe := filepath.Join(base, "WowRegionSwitcher_Managed.exe")
 	buildLog := filepath.Join(base, "build.log")

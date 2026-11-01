@@ -60,6 +60,17 @@ namespace WowRegionSwitcher
         }
         public static void Run()
         {
+            // 2026-11-01 regression: switching Asia launched Battle.net, then
+            // a second queued/manual request tried to close that new client.
+            Ensure(SwitchReentryPolicy.CanStart(false, false),
+                "a switch is allowed when idle and not verifying");
+            Ensure(!SwitchReentryPolicy.CanStart(true, false),
+                "a second request during an in-flight switch must be rejected");
+            Ensure(!SwitchReentryPolicy.CanStart(false, true),
+                "a second request while checking freshly launched Battle.net must be rejected");
+            Ensure(!SwitchReentryPolicy.CanStart(true, true),
+                "a busy and verifying app must reject new switch requests");
+
             // V4.1 regression: launcher was mistaken for a WoW game simply
             // because its process name begins with 'Wow'. The reported log
             // contained ONLY WowRegionSwitcher_Managed (PID 11688).

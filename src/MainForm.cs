@@ -59,12 +59,20 @@ namespace WowRegionSwitcher
         private int verificationMismatches;
         private bool prelaunchWasVerified;
         private bool busy;
+        // Switching again during the post-launch check would close the Battle.net
+        // client we just launched. This guard also covers programmatic/queued calls.
+        private bool VerificationPending
+        {
+            get { return !string.IsNullOrEmpty(verificationRegion) ||
+                (verificationTimer != null && verificationTimer.Enabled); }
+        }
+
 
         public MainForm(string autoRegion)
         {
             initialAutoRegion = autoRegion;
             settings = AppSettings.Load();
-            Text = "WoW Region Switcher v0.5.3-beta.1";
+            Text = "WoW Region Switcher v0.5.3-beta.2";
             Icon = SystemIcons.Application;
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(730, 610);
@@ -391,10 +399,18 @@ namespace WowRegionSwitcher
             lblStatus.ForeColor = color;
             lblStatus.Refresh();
         }
+        private void UpdateActionAvailability()
+        {
+            bool canChange = SwitchReentryPolicy.CanStart(busy, VerificationPending);
+            // Keep both region launchers and all state-mutating actions disabled
+            // for the ENTIRE post-launch verification window (not just the write).
+            btnCn.Enabled = btnAsia.Enabled = btnRefresh.Enabled = btnRestore.Enabled = btnConfig.Enabled = canChange;
+            // Diagnostics and logs always remain available to report problems.
+        }
         private void SetBusy(bool value)
         {
             busy = value;
-            btnCn.Enabled = btnAsia.Enabled = btnRefresh.Enabled = btnRestore.Enabled = btnConfig.Enabled = !value;
+            UpdateActionAvailability();
             Cursor = value ? Cursors.WaitCursor : Cursors.Default;
             Application.DoEvents();
         }
@@ -834,7 +850,14 @@ namespace WowRegionSwitcher
         }
         private void SwitchRegion(string region)
         {
-            if (busy) return;
+            Logger.Info("SWITCH_REQUEST", "region=" + region + " pid=" + Process.GetCurrentProcess().Id +
+                " busy=" + busy + " verification_pending=" + VerificationPending);
+            if (!SwitchReentryPolicy.CanStart(busy, VerificationPending))
+            {
+                Logger.Info("SWITCH_SUPPRESSED", "region=" + region + " (switch or post-launch verification in progress)");
+                if (!busy) SetStatus("刚启动的战网仍在路径复核中，请等验证结束后再选择区服。", orange);
+                return;
+            }
             LaunchProfile profile = settings.ForId(region);
             string target = profile.GameFolder;
             string desiredDefault = profile.DefaultInstallFolder;
@@ -1012,6 +1035,9 @@ namespace WowRegionSwitcher
                 verificationAttempts = 0;
                 verificationMismatches = 0;
                 verificationTimer.Start();
+                UpdateActionAvailability();
+                Logger.Info("POSTLAUNCH_CHECK_STARTED", "region=" + region +
+                    " pid=" + Process.GetCurrentProcess().Id + " switches locked until verification finishes");
             }
             catch (OperationCanceledException e)
             {
@@ -1097,6 +1123,7 @@ namespace WowRegionSwitcher
                     verificationTimer.Stop();
                     string region = verificationRegion;
                     verificationRegion = "";
+                    UpdateActionAvailability();
                     RefreshData();
                     InvalidDataException error = new InvalidDataException(
                         "本次切换在启动战网前" + (prelaunchWasVerified ? "已通过完整路径校验" : "未完成路径校验") +
@@ -1119,6 +1146,7 @@ namespace WowRegionSwitcher
                     verificationTimer.Stop();
                     string verifiedRegion = verificationRegion;
                     verificationRegion = "";
+                    UpdateActionAvailability();
                     Logger.Info("POSTLAUNCH_PASSED", "region=" + verifiedRegion + " attempts=" + verificationAttempts);
                     SetStatus("两项魔兽路径及战网默认安装目录均已连续复核通过；请在战网设置中确认。", green);
                 }
@@ -1133,6 +1161,7 @@ namespace WowRegionSwitcher
                     verificationTimer.Stop();
                     string region = verificationRegion;
                     verificationRegion = "";
+                    UpdateActionAvailability();
                     SetStatus("战网启动后无法验证路径，请查看错误。", orange);
                     ShowError("启动后读取验证", verificationError, region);
                 }
@@ -1140,9 +1169,11 @@ namespace WowRegionSwitcher
         }
         private void RestoreLatestBackup()
         {
-            if (busy) return;
-            verificationTimer.Stop();
-            verificationRegion = "";
+            if (!SwitchReentryPolicy.CanStart(busy, VerificationPending))
+            {
+                SetStatus("启动后复核正在进行，暂不可恢复备份。请等复核结束。", orange);
+                return;
+            }
             SetBusy(true);
             string stage = "选择备份";
             try
@@ -1228,7 +1259,7 @@ namespace WowRegionSwitcher
         private string Diagnostics()
         {
             StringBuilder data = new StringBuilder();
-            data.AppendLine("WoW Region Switcher WinForms v0.5.3-beta.1 诊断");
+            data.AppendLine("WoW Region Switcher WinForms v0.5.3-beta.2 诊断");
             data.AppendLine("时间：" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             data.AppendLine("系统：" + Environment.OSVersion + " / " + (Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit"));
             data.AppendLine("管理员权限：" + IsAdministrator());
