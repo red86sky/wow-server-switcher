@@ -1,0 +1,66 @@
+name: Build and test (no Release)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Compile .NET Framework offline test runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $csc = "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+          if (!(Test-Path $csc)) { $csc = "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe" }
+          if (!(Test-Path $csc)) { throw 'Missing .NET Framework 4.x csc.exe' }
+          $sources = Get-ChildItem src -Filter '*.cs' | ForEach-Object { $_.FullName }
+          & $csc '/nologo' '/target:exe' '/platform:anycpu' '/codepage:65001' "/out:$PWD\dist\OfflineTests.exe" '/reference:System.dll' '/reference:System.Core.dll' '/reference:System.Windows.Forms.dll' '/reference:System.Drawing.dll' '/reference:System.Xml.dll' $sources
+          if ($LASTEXITCODE -ne 0) { throw 'C# compilation failed' }
+          & .\dist\OfflineTests.exe --self-test
+          if ($LASTEXITCODE -ne 0) { throw 'In-memory regression tests failed' }
+
+      - name: Build the single-entry Windows x64 GUI EXE
+        shell: pwsh
+        run: |
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'amd64'
+          $env:CGO_ENABLED = '0'
+          go build -trimpath -ldflags '-H=windowsgui -s -w' -o 'dist/WoWRegionSwitcher.exe' .
+          if ($LASTEXITCODE -ne 0) { throw 'Go GUI EXE build failed' }
+
+      - name: Prepare release ZIP and SHA-256
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $v = '${{ github.ref_name }}'
+          if ($v -notlike 'v*') { $v = 'v0.5.1-dev-ci' }
+          Compress-Archive -Force -Path 'dist/WoWRegionSwitcher.exe','README.md','README.en.md','LICENSE','docs/UNRELEASED.md' -DestinationPath "dist/WoWRegionSwitcher-$v-win-x64.zip"
+          Get-ChildItem dist -File | Where-Object { $_.Name -notlike 'OfflineTests*' -and $_.Name -ne 'SHA256SUMS.txt' } | ForEach-Object {
+            "$( (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant() )  $($_.Name)"
+          } | Out-File 'dist/SHA256SUMS.txt' -Encoding utf8
+
+      - name: Upload built files
+        uses: actions/upload-artifact@v4
+        with:
+          name: WoWRegionSwitcher-win-x64
+          path: |
+            dist/WoWRegionSwitcher.exe
+            dist/WoWRegionSwitcher-*-win-x64.zip
+            dist/SHA256SUMS.txt
+

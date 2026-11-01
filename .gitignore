@@ -1,27 +1,26 @@
-# Local configuration and credentials
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-
-# Local runtime data
-logs/
-backups/
-*.log
-*.local.json
-
-# Build artifacts and dependencies
-node_modules/
-dist/
-build/
-bin/
-obj/
-.venv/
-__pycache__/
-
-# Editor and OS files
+# Builds and local state
+/dist/
+/artifacts/
+/bin/
+/obj/
+*.pdb
+*.user
 .vs/
+.vscode/
 .idea/
-Thumbs.db
+settings.xml
+product.db
+product.db.*
+*.db.bak
+launcher.log
+build.log
+*.tmp
 .DS_Store
+Thumbs.db
+
+# local logs / product data / runtime artifacts
+*.db
+*.db.bak
+*.log
+settings.xml
+managed_v*/
