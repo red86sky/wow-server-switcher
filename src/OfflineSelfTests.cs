@@ -235,6 +235,50 @@ namespace WowRegionSwitcher
                 !ProcessClassifier.IsBattleNetName("Wow"),
                 "exact process names for graceful client shutdown");
 
+            // v0.5.3: downloads default directory in separate Battle.net JSON.
+            // Preserve all unrelated settings *exactly*, including account settings.
+            const string ClientJson = "{\r\n  \"Client\": {\"SavedAccountNames\": \"keep-this\", \"Install\": {\"DefaultInstallPath\": \"D:\\\\Games\\\\Battle.netLibrary\", \"PeerToPeer\": \"false\"}, \"LoginSettings\": {\"SelectedRegion\": \"CN\"}}\r\n}";
+            string modifiedClient = BattleNetClientSettings.PatchForTest(ClientJson,
+                @"D:\Games\Battle.netLibrary_cn");
+            Ensure(ProductDbEditor.SameFolder(BattleNetClientSettings.ReadForTest(modifiedClient),
+                @"D:\Games\Battle.netLibrary_cn"),
+                "downloads default path correctly rewrites");
+            Ensure(modifiedClient.Contains("\"SavedAccountNames\": \"keep-this\"") &&
+                modifiedClient.Contains("\"PeerToPeer\": \"false\"") &&
+                modifiedClient.Contains("\"SelectedRegion\": \"CN\"") &&
+                modifiedClient.StartsWith("{\r\n"),
+                "all other Battle.net client settings remain byte-for-byte intact");
+            Ensure(BattleNetClientSettings.PatchForTest(modifiedClient,
+                @"D:\Games\Battle.netLibrary_cn") == modifiedClient,
+                "repeated default-directory switch is stable");
+            string alternate = "{\"User\":{\"Client\":{\"Install\":{\"DefaultInstallPath\":\"D:/Games/Old\"}}},\"Other\":{\"DefaultInstallPath\":\"keep\"}}";
+            string alternateResult = BattleNetClientSettings.PatchForTest(alternate, @"E:\Games\New");
+            Ensure(BattleNetClientSettings.ReadForTest(alternateResult) == @"E:\Games\New" &&
+                alternateResult.Contains("\"DefaultInstallPath\":\"keep\""),
+                "optional User.Client nested install path and unrelated same-key are preserved");
+            bool rejectedMultipleDefaults = false;
+            try { BattleNetClientSettings.ReadForTest("{\"Client\":{\"Install\":{\"DefaultInstallPath\":\"A\",\"DefaultInstallPath\":\"B\"}}}"); }
+            catch (InvalidDataException) { rejectedMultipleDefaults = true; }
+            Ensure(rejectedMultipleDefaults, "multiple conflicting defaults are rejected");
+            bool rejectedMissingDefault = false;
+            try { BattleNetClientSettings.PatchForTest("{\"Client\":{\"Install\":{\"NoPath\":\"X\"}}}", @"C:\Games"); }
+            catch (InvalidDataException) { rejectedMissingDefault = true; }
+            Ensure(rejectedMissingDefault, "no default path means no speculative config update");
+            bool rejectedInvalidJson = false;
+            try { BattleNetClientSettings.PatchForTest("{\"Client\":false,}", @"C:\Games"); }
+            catch (InvalidDataException) { rejectedInvalidJson = true; }
+            Ensure(rejectedInvalidJson, "invalid client JSON rejected");
+            AppSettings defaults = AppSettings.CreateDefaults();
+            Ensure(defaults.First.DefaultInstallFolder == @"D:\Games\Battle.netLibrary_cn" &&
+                defaults.Second.DefaultInstallFolder == @"D:\Games\Battle.netLibrary",
+                "default download directory is separate from WoW game directory");
+            defaults.First.DefaultInstallFolder = @"E:\CustomCN";
+            defaults.Second.DefaultInstallFolder = @"F:\CustomAsia";
+            defaults.Validate();
+            Ensure(defaults.First.DefaultInstallFolder == @"E:\CustomCN" &&
+                defaults.Second.DefaultInstallFolder == @"F:\CustomAsia",
+                "user-defined Battle.net default directories validate independently");
+
             bool rejectedMissing = false;
             try { ProductDbEditor.PatchBoth(standard, ASIA, "wow", "missing-code", CN, ASIA); }
             catch (InvalidDataException) { rejectedMissing = true; }

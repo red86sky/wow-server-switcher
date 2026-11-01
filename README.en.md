@@ -1,8 +1,8 @@
 # WoW Region Switcher
 
-**v0.5.1-dev** — Windows 10/11 x64 · C# WinForms · MIT License
+**v0.5.2-dev** — Windows 10/11 x64 · C# WinForms · MIT License
 
-[简体中文](README.md) · [Release notes](docs/RELEASE_NOTES_v0.5.1-dev.md) · [Security](SECURITY.md)
+[简体中文](README.md) · [Unreleased changes](docs/UNRELEASED.md) · [Security](SECURITY.md)
 
 An **unofficial** Windows GUI tool for two configurable Battle.net launch profiles. Each profile stores its own display name, World of Warcraft installation root, and Battle.net login-region argument. When selected, the app attempts to redirect Battle.net installation records for the retail WoW (`wow`) and WoW Forever (`wowf`, falling back to `wow_classic_beta` if that is all the machine has), then launches Battle.net.
 

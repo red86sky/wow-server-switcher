@@ -11,6 +11,7 @@ namespace WowRegionSwitcher
         private readonly AppSettings working;
         private readonly TextBox[] names = new TextBox[2];
         private readonly TextBox[] paths = new TextBox[2];
+        private readonly TextBox[] defaults = new TextBox[2];
         private readonly ComboBox[] regions = new ComboBox[2];
         private static readonly string[] RegionOptions = {
             "CN - 中国大陆", "TW - 亚洲（台湾入口）", "KR - 亚洲（韩国入口）",
@@ -23,8 +24,8 @@ namespace WowRegionSwitcher
         {
             working = current.Clone();
             Text = "配置两个启动入口";
-            Width = 840; Height = 610;
-            MinimumSize = new Size(760, 560);
+            Width = 900; Height = 750;
+            MinimumSize = new Size(790, 700);
             StartPosition = FormStartPosition.CenterParent;
             Font = new Font("Microsoft YaHei UI", 9.5f);
             BackColor = Color.FromArgb(26, 31, 42);
@@ -49,14 +50,15 @@ namespace WowRegionSwitcher
                 ForeColor = Color.White, Padding = new Padding(13, 19, 13, 12)
             };
             TableLayoutPanel content = new TableLayoutPanel {
-                Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 3
+                Dock = DockStyle.Fill, ColumnCount = 3, RowCount = 4
             };
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 100));
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
             content.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 105));
-            for (int i = 0; i < 3; i++) content.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            for (int i = 0; i < 4; i++) content.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
             names[index] = new TextBox { Dock = DockStyle.Fill, Text = profile.Name, Margin = new Padding(0, 8, 6, 9) };
             paths[index] = new TextBox { Dock = DockStyle.Fill, Text = profile.GameFolder, Margin = new Padding(0, 8, 6, 9) };
+            defaults[index] = new TextBox { Dock = DockStyle.Fill, Text = profile.DefaultInstallFolder, Margin = new Padding(0, 8, 6, 9) };
             regions[index] = new ComboBox {
                 Dock = DockStyle.Fill, DropDownStyle = ComboBoxStyle.DropDownList,
                 Margin = new Padding(0, 8, 6, 9)
@@ -67,14 +69,17 @@ namespace WowRegionSwitcher
             if (regions[index].SelectedIndex < 0) regions[index].SelectedIndex = 0;
             Label nameLabel = MakeInfo("按钮名称", 25);
             Label pathLabel = MakeInfo("游戏根目录", 25);
+            Label defaultLabel = MakeInfo("默认安装目录", 25);
             Label regionLabel = MakeInfo("战网登录区域", 25);
-            nameLabel.Margin = pathLabel.Margin = regionLabel.Margin = new Padding(0, 12, 0, 0);
+            nameLabel.Margin = pathLabel.Margin = defaultLabel.Margin = regionLabel.Margin = new Padding(0, 12, 0, 0);
             content.Controls.Add(nameLabel, 0, 0);
             content.Controls.Add(pathLabel, 0, 1);
-            content.Controls.Add(regionLabel, 0, 2);
+            content.Controls.Add(defaultLabel, 0, 2);
+            content.Controls.Add(regionLabel, 0, 3);
             content.Controls.Add(names[index], 1, 0);
             content.Controls.Add(paths[index], 1, 1);
-            content.Controls.Add(regions[index], 1, 2);
+            content.Controls.Add(defaults[index], 1, 2);
+            content.Controls.Add(regions[index], 1, 3);
             Button browse = new Button { Text = "浏览...", Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 10) };
             browse.Click += delegate {
                 using (FolderBrowserDialog picker = new FolderBrowserDialog()) {
@@ -84,6 +89,15 @@ namespace WowRegionSwitcher
                 }
             };
             content.Controls.Add(browse, 2, 1);
+            Button browseDefault = new Button { Text = "浏览...", Dock = DockStyle.Fill, Margin = new Padding(0, 6, 0, 10) };
+            browseDefault.Click += delegate {
+                using (FolderBrowserDialog picker = new FolderBrowserDialog()) {
+                    picker.Description = "战网 → 设置 → 下载 → 默认安装目录（通常是游戏根目录的上一级）";
+                    picker.SelectedPath = Directory.Exists(defaults[index].Text) ? defaults[index].Text : "";
+                    if (picker.ShowDialog(this) == DialogResult.OK) defaults[index].Text = picker.SelectedPath;
+                }
+            };
+            content.Controls.Add(browseDefault, 2, 2);
             group.Controls.Add(content);
             return group;
         }
@@ -98,12 +112,12 @@ namespace WowRegionSwitcher
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 51));
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 55));
-            Label intro = MakeInfo("分别配置两个入口的名称、安装目录和战网登录区域。\r\n注意：登录区域不等于角色所在的游戏服务器；不会修改账号或 product.db 的 play_region 字段。", 60);
+            Label intro = MakeInfo("分别配置入口名称、魔兽游戏根目录、战网下载默认安装目录和登录区域。\r\n注意：登录区域不等于角色所在的游戏服务器；不会修改账号或 product.db 的 play_region 字段。", 60);
             intro.Dock = DockStyle.Fill;
             layout.Controls.Add(intro, 0, 0);
             layout.Controls.Add(MakeProfile(working.First, 0), 0, 1);
             layout.Controls.Add(MakeProfile(working.Second, 1), 0, 2);
-            Label note = MakeInfo("修改配置只会保存设置；点击启动入口时，程序才会检查并尝试更新游戏安装记录。", 39);
+            Label note = MakeInfo("配置保存在本机；启动时会分别备份 product.db 和战网客户端配置并校验。", 39);
             note.Dock = DockStyle.Fill; note.Padding = new Padding(4, 12, 0, 0);
             layout.Controls.Add(note, 0, 3);
             FlowLayoutPanel buttons = new FlowLayoutPanel { FlowDirection = FlowDirection.RightToLeft, Dock = DockStyle.Fill };
@@ -127,6 +141,7 @@ namespace WowRegionSwitcher
                 {
                     profiles[i].Name = names[i].Text;
                     profiles[i].GameFolder = paths[i].Text;
+                    profiles[i].DefaultInstallFolder = defaults[i].Text;
                     profiles[i].LoginRegion = regions[i].Text.Substring(0, 2);
                 }
                 working.Save();

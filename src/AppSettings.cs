@@ -12,11 +12,12 @@ namespace WowRegionSwitcher
         public string Id;
         public string Name;
         public string GameFolder;
+        public string DefaultInstallFolder; // Battle.net Settings > Downloads > Default install directory
         public string LoginRegion;
 
         public LaunchProfile Clone()
         {
-            return new LaunchProfile { Id = Id, Name = Name, GameFolder = GameFolder, LoginRegion = LoginRegion };
+            return new LaunchProfile { Id = Id, Name = Name, GameFolder = GameFolder, DefaultInstallFolder = DefaultInstallFolder, LoginRegion = LoginRegion };
         }
     }
 
@@ -35,11 +36,13 @@ namespace WowRegionSwitcher
             return new AppSettings {
                 First = new LaunchProfile {
                     Id = "CN", Name = "国服", LoginRegion = "CN",
-                    GameFolder = @"D:\Games\Battle.netLibrary_cn\World of Warcraft"
+                    GameFolder = @"D:\Games\Battle.netLibrary_cn\World of Warcraft",
+                    DefaultInstallFolder = @"D:\Games\Battle.netLibrary_cn"
                 },
                 Second = new LaunchProfile {
                     Id = "ASIA", Name = "亚服", LoginRegion = "TW",
-                    GameFolder = @"D:\Games\Battle.netLibrary\World of Warcraft"
+                    GameFolder = @"D:\Games\Battle.netLibrary\World of Warcraft",
+                    DefaultInstallFolder = @"D:\Games\Battle.netLibrary"
                 }
             };
         }
@@ -87,6 +90,7 @@ namespace WowRegionSwitcher
             if (!IsSupportedRegion(profile.LoginRegion))
                 throw new InvalidDataException("不支持的战网启动区域：" + profile.LoginRegion + "。允许 CN/TW/KR/US/EU。");
             profile.GameFolder = NormalizedFolder(profile.GameFolder);
+            profile.DefaultInstallFolder = NormalizedFolder(profile.DefaultInstallFolder);
         }
 
         public void Validate()
@@ -110,6 +114,11 @@ namespace WowRegionSwitcher
                 Id = id,
                 Name = ReadAttr(attributes, "name"),
                 GameFolder = ReadAttr(attributes, "gameFolder"),
+                // v1 settings created before the Downloads setting was introduced.
+                // Preserve all old values; migrate the third directory to the parent.
+                DefaultInstallFolder = attributes["defaultInstallFolder"] == null ?
+                    Path.GetDirectoryName(ReadAttr(attributes, "gameFolder")) :
+                    ReadAttr(attributes, "defaultInstallFolder"),
                 LoginRegion = ReadAttr(attributes, "loginRegion")
             };
         }
@@ -130,7 +139,7 @@ namespace WowRegionSwitcher
             doc.XmlResolver = null;
             using (XmlReader reader = XmlReader.Create(FilePath, options)) doc.Load(reader);
             XmlElement root = doc.DocumentElement;
-            if (root == null || root.Name != "WoWRegionSwitcherSettings" || root.GetAttribute("version") != "1")
+            if (root == null || root.Name != "WoWRegionSwitcherSettings" || (root.GetAttribute("version") != "1" && root.GetAttribute("version") != "2"))
                 throw new InvalidDataException("不认识的 settings.xml 格式/版本。不会覆盖已有设置。" );
             XmlNodeList profiles = root.SelectNodes("Profile");
             if (profiles == null || profiles.Count != 2)
@@ -150,6 +159,7 @@ namespace WowRegionSwitcher
             writer.WriteAttributeString("name", profile.Name);
             writer.WriteAttributeString("loginRegion", profile.LoginRegion);
             writer.WriteAttributeString("gameFolder", profile.GameFolder);
+            writer.WriteAttributeString("defaultInstallFolder", profile.DefaultInstallFolder);
             writer.WriteEndElement();
         }
 
@@ -167,7 +177,7 @@ namespace WowRegionSwitcher
                 {
                     writer.WriteStartDocument();
                     writer.WriteStartElement("WoWRegionSwitcherSettings");
-                    writer.WriteAttributeString("version", "1");
+                    writer.WriteAttributeString("version", "2");
                     WriteProfile(writer, First);
                     WriteProfile(writer, Second);
                     writer.WriteEndElement();

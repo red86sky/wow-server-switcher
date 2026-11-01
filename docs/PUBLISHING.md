@@ -1,10 +1,11 @@
-# Repository delivery status / 仓库交付状态
+# Release process / 发布流程
 
-This repository is a source-code snapshot for testing, **not a GitHub Release**.
+Repository: https://github.com/red86sky/wow-server-switcher
 
-- Push source to `main` only. **Do not push a version tag** until a Release is explicitly authorized.
-- `.github/workflows/ci.yml` compiles and tests on Windows, and uploads **CI build artifacts** only.
-- No `action-gh-release`, no token with contents:write, and no auto-publishing workflow.
-- After validation on a clean Windows 10/11 machine, create a Release only on a separate explicit request.
-
-当前仅上传代码，不创建 GitHub Release 或版本标签。Actions 仅上传 CI 构建产物。
+- Normal `main` pushes run `.github/workflows/ci.yml` and upload CI artifacts; they **do not create Releases**.
+- `v0.5.3-beta.1` is created by a dedicated **one-time** GitHub Actions workflow after Windows compilation and offline tests pass.
+- GitHub Actions creates the `v0.5.3-beta.1` tag, uploads the single Windows x64 GUI EXE, portable ZIP, and SHA256SUMS, and marks the Release as **pre-release**.
+- The one-time workflow runs on its own workflow-file addition; later code commits do not automatically publish.
+- Future releases require a deliberate new workflow dispatch or new reviewed release automation. Do not reuse a beta tag for different builds.
+- Never commit local settings, passwords, login tokens, `product.db`, `Battle.net.config`, logs or backups.
+- The app is not affiliated with Blizzard and Battle.net can change undocumented config formats or overwrite game paths after launch.

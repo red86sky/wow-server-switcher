@@ -1,6 +1,6 @@
 # WoW Region Switcher · 魔兽世界双区服助手
 
-> **v0.5.1-dev（未发布测试源码）** · Windows 10/11 x64 · C# WinForms · MIT License  
+> **v0.5.2-dev（未发布测试源码）** · Windows 10/11 x64 · C# WinForms · MIT License  
 > 非官方开源工具，与 Blizzard Entertainment / Battle.net / 网易无关联。
 
 [English](README.en.md) · [未发布变更](docs/UNRELEASED.md) · [安全说明](SECURITY.md)
@@ -8,6 +8,13 @@
 这是一个 Windows 桌面工具，让使用者通过 **两个可配置的启动入口**，切换 Battle.net 记录的《魔兽世界》（`wow`）和《魔兽世界：无限》（`wowf`，若本机只有测试版则为 `wow_classic_beta`）的游戏根目录，然后通过选定的登录区域启动 Battle.net。
 
 **重要现状：** 已完成离线的数据库结构保护及回归测试设计，但当前版本仍存在待核实问题：部分用户的 Battle.net / Agent 会在启动后**回写**安装路径。工具会在启动后复核并弹窗报告错误，**不保证任何 Battle.net 版本都能稳定切换成功**。请勿在更新、安装、修复或游戏运行期间使用。建议仅用于愿意测试并能恢复安装记录的用户。
+
+## 最新修复（未发布 v0.5.2-dev）
+
+- 修复亚服切换国服被 `agent：更新中` 误拦截：**只有已经确认 Agent 进程退出且没有 `product.db.new` 时**，忽略战网 Agent 自身残留的操作状态。
+- 仍然禁止在 `wow` / `wowf` / 其他游戏的真实更新任务以及安装握手期间切换。
+- 诊断区分“当前需阻止切换的任务”与“已停止 Agent 的残留操作记录”。
+- 仍需本机 Battle.net 端到端测试；不提供任何绕过正在运行的 Agent 的选项。
 
 ## 功能
 

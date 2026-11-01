@@ -39,6 +39,8 @@ namespace WowRegionSwitcher
         private Label lblAsiaFolder;
         private Label lblCnRegion;
         private Label lblAsiaRegion;
+        private Label lblCnDefault;
+        private Label lblAsiaDefault;
         private Button btnConfig;
         private Button btnCn;
         private Button btnAsia;
@@ -49,6 +51,8 @@ namespace WowRegionSwitcher
         private Timer verificationTimer;
         private string verificationRegion = "";
         private string verificationTarget = "";
+        private string verificationDefaultDirectory = "";
+        private string verificationClientConfigFile = "";
         private string verificationNormalCode = "";
         private string verificationSecondCode = "";
         private int verificationAttempts;
@@ -60,7 +64,7 @@ namespace WowRegionSwitcher
         {
             initialAutoRegion = autoRegion;
             settings = AppSettings.Load();
-            Text = "WoW Region Switcher v0.5.2-dev";
+            Text = "WoW Region Switcher v0.5.3-beta.1";
             Icon = SystemIcons.Application;
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(730, 610);
@@ -128,7 +132,7 @@ namespace WowRegionSwitcher
             Label title = NewLabel("魔兽世界 · 双区服助手", 19F, white, true);
             title.Dock = DockStyle.Top;
             title.Height = 47;
-            Label tagline = NewLabel("两套自定义安装目录和战网登录区域 · WinForms 单 EXE 入口（测试版）", 9F, muted, false);
+            Label tagline = NewLabel("两套游戏路径 / 战网下载目录 / 登录区域 · WinForms 单 EXE（预发布版）", 9F, muted, false);
             tagline.Dock = DockStyle.Top;
             tagline.Height = 26;
             heading.Controls.Add(tagline);
@@ -155,8 +159,8 @@ namespace WowRegionSwitcher
             buttons.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
             root.Controls.Add(buttons, 0, 2);
 
-            Panel cnPanel = BuildRegionPanel(Color.FromArgb(24, 91, 164), out btnCn, out lblCnFolder, out lblCnRegion);
-            Panel asiaPanel = BuildRegionPanel(Color.FromArgb(22, 117, 97), out btnAsia, out lblAsiaFolder, out lblAsiaRegion);
+            Panel cnPanel = BuildRegionPanel(Color.FromArgb(24, 91, 164), out btnCn, out lblCnFolder, out lblCnDefault, out lblCnRegion);
+            Panel asiaPanel = BuildRegionPanel(Color.FromArgb(22, 117, 97), out btnAsia, out lblAsiaFolder, out lblAsiaDefault, out lblAsiaRegion);
             cnPanel.Margin = new Padding(0, 0, 8, 0);
             asiaPanel.Margin = new Padding(8, 0, 0, 0);
             cnPanel.Dock = asiaPanel.Dock = DockStyle.Fill;
@@ -168,7 +172,8 @@ namespace WowRegionSwitcher
             Panel help = new Panel() { Dock = DockStyle.Fill, BackColor = card, Padding = new Padding(16, 8, 16, 5) };
             Label helpTitle = NewLabel("运行方式", 9.4F, white, true);
             helpTitle.Height = 22; helpTitle.Dock = DockStyle.Top;
-            Label helpText = NewLabel("点击“配置入口”可自定义名称、游戏根目录和登录区域。切换前自动正常关闭战网、等待 Agent 退出；\r\n若游戏仍运行或后台无法退出会弹窗阻止切换。修改前自动备份，不移动文件。", 8.7F, muted, false);
+            Label helpText = NewLabel("点击“配置入口”可自定义名称、魔兽安装目录、战网默认下载目录和登录区域。
+切换前自动正常关闭战网、等待 Agent 退出；\r\n若游戏仍运行或后台无法退出会弹窗阻止切换。修改前自动备份，不移动文件。", 8.7F, muted, false);
             helpText.Height = 42; helpText.Dock = DockStyle.Fill;
             help.Controls.Add(helpText);
             help.Controls.Add(helpTitle);
@@ -210,25 +215,30 @@ namespace WowRegionSwitcher
             root.Controls.Add(footnote, 0, 5);
         }
 
-        private Panel BuildRegionPanel(Color buttonColor, out Button button, out Label folderLabel, out Label regionLabel)
+        private Panel BuildRegionPanel(Color buttonColor, out Button button, out Label folderLabel, out Label defaultLabel, out Label regionLabel)
         {
             Panel box = new Panel() { BackColor = card, Dock = DockStyle.Fill, Padding = new Padding(13) };
-            TableLayoutPanel grid = new TableLayoutPanel() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 3 };
-            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 68));
+            TableLayoutPanel grid = new TableLayoutPanel() { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 4 };
+            grid.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
-            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 29));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
+            grid.RowStyles.Add(new RowStyle(SizeType.Absolute, 26));
             button = NewButton("▶  启动", buttonColor);
             button.Dock = DockStyle.Fill;
             button.Font = MakeFont(17F, true);
             folderLabel = NewLabel("（未配置）", 8.6F, muted, false);
             folderLabel.TextAlign = ContentAlignment.MiddleCenter;
             folderLabel.Dock = DockStyle.Fill;
+            defaultLabel = NewLabel("默认安装：未配置", 8.1F, muted, false);
+            defaultLabel.TextAlign = ContentAlignment.MiddleCenter;
+            defaultLabel.Dock = DockStyle.Fill;
             regionLabel = NewLabel("--setregion=...", 8.3F, muted, false);
             regionLabel.TextAlign = ContentAlignment.MiddleCenter;
             regionLabel.Dock = DockStyle.Fill;
             grid.Controls.Add(button, 0, 0);
             grid.Controls.Add(folderLabel, 0, 1);
-            grid.Controls.Add(regionLabel, 0, 2);
+            grid.Controls.Add(defaultLabel, 0, 2);
+            grid.Controls.Add(regionLabel, 0, 3);
             box.Controls.Add(grid);
             return box;
         }
@@ -239,6 +249,8 @@ namespace WowRegionSwitcher
             btnAsia.Text = "▶  启动" + settings.Second.Name;
             lblCnFolder.Text = settings.First.GameFolder;
             lblAsiaFolder.Text = settings.Second.GameFolder;
+            lblCnDefault.Text = "战网默认安装：" + settings.First.DefaultInstallFolder;
+            lblAsiaDefault.Text = "战网默认安装：" + settings.Second.DefaultInstallFolder;
             lblCnRegion.Text = "战网启动区域：" + settings.First.LoginRegion;
             lblAsiaRegion.Text = "战网启动区域：" + settings.Second.LoginRegion;
             lblCnFolder.ForeColor = SeemsLikeGameFolder(ChinaRoot) ? green : orange;
@@ -261,7 +273,7 @@ namespace WowRegionSwitcher
             }
             UpdateProfileUi();
             SafeRefresh(true);
-            SetStatus("配置已保存。启动入口会使用新目录和战网登录区域。", green);
+            SetStatus("配置已保存。下次点击入口时会同步游戏目录、战网下载默认目录和登录区域。", green);
         }
 
         private void OnShown(object sender, EventArgs e)
@@ -682,6 +694,41 @@ namespace WowRegionSwitcher
                    string.Equals(name, "Battle.net Launcher.exe", StringComparison.OrdinalIgnoreCase);
         }
 
+        // The client JSON and product.db are separate stores. Both must be backed
+        // up before any write; never rewrite all JSON settings via serialization.
+        private string SaveClientConfigBackup(string productBackup, ClientConfigChange change)
+        {
+            string backup = productBackup + ".clientconfig.bak";
+            if (File.Exists(backup)) throw new IOException("客户端配置备份文件名发生冲突：" + backup);
+            File.WriteAllBytes(backup, change.Original);
+            File.WriteAllText(productBackup + ".clientconfig.path.txt", change.Path, Encoding.UTF8);
+            return backup;
+        }
+        private static void ReplaceClientConfigAtomically(string path, byte[] updated, byte[] expected, string rollbackFile)
+        {
+            string temp = path + ".wow-switch-" + Process.GetCurrentProcess().Id + ".tmp";
+            bool replaced = false;
+            try
+            {
+                if (!File.ReadAllBytes(path).SequenceEqual(expected))
+                    throw new IOException("战网配置在切换期间被其他程序修改，已停止操作。");
+                File.WriteAllBytes(temp, updated);
+                File.Replace(temp, path, null);
+                replaced = true;
+                if (!File.ReadAllBytes(path).SequenceEqual(updated))
+                    throw new IOException("客户端配置写入后验证失败。");
+            }
+            catch
+            {
+                if (replaced && rollbackFile != null)
+                {
+                    try { File.Copy(rollbackFile, path, true); }
+                    catch (Exception rollback) { Logger.Error("CRITICAL_CLIENT_CONFIG_ROLLBACK", rollback); }
+                }
+                throw;
+            }
+            finally { try { if (File.Exists(temp)) File.Delete(temp); } catch { } }
+        }
         private static string DbFingerprint(byte[] bytes)
         {
             using (SHA256 hash = SHA256.Create())
@@ -791,6 +838,7 @@ namespace WowRegionSwitcher
             if (busy) return;
             LaunchProfile profile = settings.ForId(region);
             string target = profile.GameFolder;
+            string desiredDefault = profile.DefaultInstallFolder;
             string label = profile.Name;
             string stage = "准备";
             bool pathsReady = false;
@@ -806,6 +854,9 @@ namespace WowRegionSwitcher
                     throw new DirectoryNotFoundException("未找到" + label + "游戏目录：" + target + "\r\n请确认已在配置中选择真实的游戏根目录。本程序不会创建空游戏文件夹。");
                 if (!SeemsLikeGameFolder(target))
                     throw new InvalidDataException("目标文件夹存在，但缺少游戏标记或 Data 等目录，无法证明这是魔兽世界安装目录：" + target);
+                if (!Directory.Exists(desiredDefault))
+                    throw new DirectoryNotFoundException("战网下载默认安装目录不存在：" + desiredDefault +
+                        "\r\n请在“配置入口”中选择真实存在的文件夹。工具不会创建或移动游戏文件。");
 
                 stage = "查找战网启动程序";
                 SetStatus("正在识别战网程序...", orange);
@@ -849,18 +900,78 @@ namespace WowRegionSwitcher
                         throw new OperationCanceledException("未授权修改配置之外的历史路径。没有修改数据库。");
                     trustedRoots = trustedRoots.Concat(oldRoots).ToArray();
                 }
+                stage = "检查战网下载默认安装目录配置";
+                ClientConfigChange config = BattleNetClientSettings.Prepare(desiredDefault);
                 stage = "准备并校验修改内容";
                 byte[] updated = ProductDbEditor.PatchBoth(before, target, "wow", secondCode, trustedRoots);
-                if (!updated.SequenceEqual(before))
+                bool dbNeedsUpdate = !updated.SequenceEqual(before);
+                bool configNeedsUpdate = !config.Updated.SequenceEqual(config.Original);
+                if (dbNeedsUpdate || configNeedsUpdate)
                 {
-                    stage = "备份安装数据库";
+                    stage = "同时备份游戏数据库和战网下载配置";
                     string backup = NewBackup(region);
-                    stage = "原子写入并复核安装数据库";
-                    SetStatus("已备份，正在统一两款游戏的全部安装记录...", orange);
-                    ReplaceAtomically(updated, backup, before);
-                    Logger.Info("Switch", label + " target=" + target + " product=wow," + secondCode + " backup=" + backup);
+                    string clientBackup = SaveClientConfigBackup(backup, config);
+                    bool configWritten = false;
+                    bool dbWritten = false;
+                    try
+                    {
+                        if (configNeedsUpdate)
+                        {
+                            stage = "修改战网下载默认安装目录";
+                            SetStatus("备份完成，正在更新战网默认安装目录...", orange);
+                            ReplaceClientConfigAtomically(config.Path, config.Updated, config.Original, clientBackup);
+                            configWritten = true;
+                        }
+                        if (dbNeedsUpdate)
+                        {
+                            stage = "修改并复核魔兽安装数据库";
+                            SetStatus("正在统一两项魔兽游戏的全部安装记录...", orange);
+                            ReplaceAtomically(updated, backup, before);
+                            dbWritten = true;
+                        }
+                        stage = "独立核验战网默认安装目录";
+                        if (!ProductDbEditor.SameFolder(BattleNetClientSettings.ReadDirectory(config.Path), desiredDefault))
+                            throw new InvalidDataException("战网客户端默认安装目录写入后不匹配目标路径。");
+                    }
+                    catch
+                    {
+                        if (dbWritten)
+                        {
+                            try
+                            {
+                                if (File.ReadAllBytes(dbPath).SequenceEqual(updated))
+                                    ReplaceAtomically(before, backup, updated);
+                                else Logger.Info("DB_ROLLBACK_SKIPPED", "File changed externally; original backup=" + backup);
+                            }
+                            catch (Exception rollbackError)
+                            {
+                                Logger.Error("CRITICAL_DB_ROLLBACK", rollbackError);
+                                MessageBox.Show(this, "魔兽数据库恢复失败，请勿继续启动战网。原备份：\r\n" + backup,
+                                    "需要手动恢复", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                        if (configWritten)
+                        {
+                            try
+                            {
+                                // Avoid overwriting an external modification made after our write.
+                                if (File.ReadAllBytes(config.Path).SequenceEqual(config.Updated))
+                                    ReplaceClientConfigAtomically(config.Path, config.Original, config.Updated, clientBackup);
+                                else Logger.Info("CLIENT_CONFIG_ROLLBACK_SKIPPED", "File changed externally; original backup=" + clientBackup);
+                            }
+                            catch (Exception rollbackError)
+                            {
+                                Logger.Error("CRITICAL_CLIENT_CONFIG_ROLLBACK", rollbackError);
+                                MessageBox.Show(this, "战网客户端配置恢复失败，请勿继续启动战网。原备份：\r\n" + clientBackup,
+                                    "需要手动恢复", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                            }
+                        }
+                        throw;
+                    }
+                    Logger.Info("Switch", label + " wow_target=" + target + " default_install=" + desiredDefault +
+                        " product=wow," + secondCode + " db_backup=" + backup + " config_backup=" + clientBackup);
                 }
-                else Logger.Info("Switch", "Already selected " + label + " target=" + target);
+                else Logger.Info("Switch", "Already selected " + label + " target=" + target + " default_install=" + desiredDefault);
 
                 stage = "启动前独立核查 / 记录校验指纹";
                 byte[] ready = File.ReadAllBytes(dbPath);
@@ -870,8 +981,11 @@ namespace WowRegionSwitcher
                         "这说明存在其他进程写入数据库；已阻止启动战网。\r\n" +
                         "wow：" + DescribeProduct(readyProducts, "wow") + "\r\n" +
                         secondCode + "：" + DescribeProduct(readyProducts, secondCode));
+                if (!ProductDbEditor.SameFolder(BattleNetClientSettings.ReadDirectory(config.Path), desiredDefault))
+                    throw new InvalidDataException("战网启动前检查发现客户端默认安装目录不匹配目标入口。已阻止启动。");
                 prelaunchWasVerified = true;
                 Logger.Info("PRELAUNCH_VERIFIED", "region=" + region + " target=" + target +
+                    " default_install=" + desiredDefault + " client_config=" + config.Path +
                     " digest=" + DbFingerprint(ready) + " bytes=" + ready.Length +
                     " write_time_utc=" + File.GetLastWriteTimeUtc(dbPath).ToString("o"));
                 pathsReady = true;
@@ -892,6 +1006,8 @@ namespace WowRegionSwitcher
                 SetStatus("数据库路径已切换，战网已启动；正在复核 Agent 是否覆盖记录...", orange);
                 verificationRegion = region;
                 verificationTarget = target;
+                verificationDefaultDirectory = desiredDefault;
+                verificationClientConfigFile = config.Path;
                 verificationNormalCode = "wow";
                 verificationSecondCode = secondCode;
                 verificationAttempts = 0;
@@ -961,12 +1077,15 @@ namespace WowRegionSwitcher
                 ProductRecord[] records = ReadRecords();
                 bool normalOk = HasProductAt(records, verificationNormalCode, verificationTarget);
                 bool secondOk = HasProductAt(records, verificationSecondCode, verificationTarget);
-                if (!normalOk || !secondOk)
+                string actualDefault = BattleNetClientSettings.ReadDirectory(verificationClientConfigFile);
+                bool defaultOk = ProductDbEditor.SameFolder(actualDefault, verificationDefaultDirectory);
+                if (!normalOk || !secondOk || !defaultOk)
                 {
                     verificationMismatches++;
                     Logger.Info("POSTLAUNCH_MISMATCH", "attempt=" + verificationAttempts +
                         " mismatch=" + verificationMismatches +
-                        " target=" + verificationTarget +
+                        " target=" + verificationTarget + " default_install_expected=" + verificationDefaultDirectory +
+                        " default_install_actual=" + actualDefault +
                         " digest=" + DbFingerprint(File.ReadAllBytes(dbPath)) +
                         " modified_utc=" + File.GetLastWriteTimeUtc(dbPath).ToString("o") +
                         " wow=" + DescribeProduct(records, verificationNormalCode) +
@@ -983,7 +1102,9 @@ namespace WowRegionSwitcher
                     InvalidDataException error = new InvalidDataException(
                         "本次切换在启动战网前" + (prelaunchWasVerified ? "已通过完整路径校验" : "未完成路径校验") +
                         "，但战网启动后连续两次检测到安装记录恢复或变更。\r\n" +
-                        "期望路径：" + verificationTarget + "\r\n" +
+                        "期望游戏路径：" + verificationTarget + "\r\n" +
+                        "期望默认安装目录：" + verificationDefaultDirectory + "\r\n" +
+                        "战网当前默认安装目录：" + actualDefault + "\r\n" +
                         "wow 当前安装记录：" + DescribeProduct(records, verificationNormalCode) + "\r\n" +
                         verificationSecondCode + " 当前安装记录：" + DescribeProduct(records, verificationSecondCode) + "\r\n\r\n" +
                         "这说明战网/Agent 可能在启动后重写数据库；尚无法确定具体来源。" +
@@ -1000,7 +1121,7 @@ namespace WowRegionSwitcher
                     string verifiedRegion = verificationRegion;
                     verificationRegion = "";
                     Logger.Info("POSTLAUNCH_PASSED", "region=" + verifiedRegion + " attempts=" + verificationAttempts);
-                    SetStatus("数据库连续复核通过。请同时查看战网设置界面确认。", green);
+                    SetStatus("两项魔兽路径及战网默认安装目录均已连续复核通过；请在战网设置中确认。", green);
                 }
             }
             catch (Exception verificationError)
@@ -1043,13 +1164,58 @@ namespace WowRegionSwitcher
                 stage = "校验备份";
                 byte[] backupBytes = File.ReadAllBytes(latest.FullName);
                 ProductDbEditor.Inspect(backupBytes);
-                stage = "备份当前数据库";
+                // Restore both pieces of a linked snapshot, never just one half.
+                string pairedConfigBackup = latest.FullName + ".clientconfig.bak";
+                string configPath = null;
+                byte[] savedConfig = null;
+                byte[] currentConfig = null;
+                if (File.Exists(pairedConfigBackup))
+                {
+                    stage = "校验配对的战网下载配置备份";
+                    string pairedPath = latest.FullName + ".clientconfig.path.txt";
+                    if (!File.Exists(pairedPath)) throw new InvalidDataException("备份缺少客户端配置路径索引，无法安全恢复。");
+                    configPath = File.ReadAllText(pairedPath, Encoding.UTF8).Trim().Trim('\uFEFF');
+                    string identified = BattleNetClientSettings.Locate();
+                    if (!string.Equals(Path.GetFullPath(configPath), Path.GetFullPath(identified), StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("历史备份关联的客户端配置文件与当前战网使用的文件不同，已中止恢复。\r\n历史：" + configPath + "\r\n当前：" + identified);
+                    savedConfig = File.ReadAllBytes(pairedConfigBackup);
+                    // Fully validate before changing either store.
+                    BattleNetClientSettings.ReadForTest(Encoding.UTF8.GetString(savedConfig).TrimStart('\uFEFF'));
+                    currentConfig = File.ReadAllBytes(configPath);
+                }
+                stage = "备份当前游戏数据库";
                 string safetyBackup = NewBackup("before_restore");
-                stage = "恢复安装数据库";
-                ReplaceAtomically(backupBytes, safetyBackup, File.ReadAllBytes(safetyBackup));
-                Logger.Info("Restore", "Restored " + latest.FullName + " ; previous backup=" + safetyBackup);
-                SetStatus("✓ 已恢复最近备份，未修改任何游戏文件。", green);
-                MessageBox.Show(this, "恢复成功。现在可以正常启动战网。", "恢复完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                string safetyConfig = null;
+                if (configPath != null)
+                {
+                    stage = "备份当前战网下载配置";
+                    safetyConfig = safetyBackup + ".clientconfig.bak";
+                    File.WriteAllBytes(safetyConfig, currentConfig);
+                    File.WriteAllText(safetyBackup + ".clientconfig.path.txt", configPath, Encoding.UTF8);
+                }
+                stage = "恢复游戏数据库";
+                byte[] currentDb = File.ReadAllBytes(safetyBackup);
+                ReplaceAtomically(backupBytes, safetyBackup, currentDb);
+                if (configPath != null)
+                {
+                    try
+                    {
+                        stage = "恢复战网下载默认目录";
+                        ReplaceClientConfigAtomically(configPath, savedConfig, currentConfig, safetyConfig);
+                    }
+                    catch
+                    {
+                        if (File.ReadAllBytes(dbPath).SequenceEqual(backupBytes))
+                        {
+                            try { ReplaceAtomically(currentDb, safetyBackup, backupBytes); }
+                            catch (Exception rollbackError) { Logger.Error("CRITICAL_RESTORE_DB_ROLLBACK", rollbackError); }
+                        }
+                        throw;
+                    }
+                }
+                Logger.Info("Restore", "Restored " + latest.FullName + " client_config=" + (configPath ?? "<legacy snapshot>") + " previous=" + safetyBackup);
+                SetStatus("✓ 最近的游戏与战网配置已恢复（旧版单文件备份仅恢复游戏数据库）。", green);
+                MessageBox.Show(this, "恢复完成。" + (configPath == null ? "旧备份不含战网默认安装目录。" : "游戏数据库和战网默认目录均已恢复。"), "恢复完成", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (OperationCanceledException) { SetStatus("已取消恢复。", orange); }
             catch (Exception e)
@@ -1063,7 +1229,7 @@ namespace WowRegionSwitcher
         private string Diagnostics()
         {
             StringBuilder data = new StringBuilder();
-            data.AppendLine("WoW Region Switcher WinForms v0.5.2-dev 诊断");
+            data.AppendLine("WoW Region Switcher WinForms v0.5.3-beta.1 诊断");
             data.AppendLine("时间：" + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
             data.AppendLine("系统：" + Environment.OSVersion + " / " + (Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit"));
             data.AppendLine("管理员权限：" + IsAdministrator());
@@ -1073,6 +1239,15 @@ namespace WowRegionSwitcher
             data.AppendLine("入口二目录：" + AsiaRoot + "，有效：" + SeemsLikeGameFolder(AsiaRoot));
             data.AppendLine("日志：" + Logger.LogFile);
             data.AppendLine("配置：" + AppSettings.FilePath);
+            data.AppendLine("入口一战网默认目录：" + settings.First.DefaultInstallFolder);
+            data.AppendLine("入口二战网默认目录：" + settings.Second.DefaultInstallFolder);
+            try
+            {
+                string configFile = BattleNetClientSettings.Locate();
+                data.AppendLine("战网客户端配置：" + configFile);
+                data.AppendLine("当前战网默认安装目录：" + BattleNetClientSettings.ReadDirectory(configFile));
+            }
+            catch (Exception ex) { data.AppendLine("战网默认目录读取失败：" + ex.Message); }
             data.AppendLine("入口一：" + settings.First.Name + "，登录区域=" + settings.First.LoginRegion);
             data.AppendLine("入口二：" + settings.Second.Name + "，登录区域=" + settings.Second.LoginRegion);
             try
